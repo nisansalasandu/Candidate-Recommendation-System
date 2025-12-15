@@ -1,0 +1,11 @@
+job_id,job_title,required_skills,experience_required,education_required,job_description
+J1,Data Analyst,"Python, SQL, Excel",1-3 years,IT or Statistics,Looking for a data analyst skilled in Python SQL and Excel
+J2,Software Engineer,"Java, Spring, MySQL",2-4 years,Computer Science,Backend software engineer role using Java and Spring
+J3,Machine Learning Intern,"Python, Machine Learning",0-2 years,Data Science,ML internship focusing on model development
+J4,HR Executive,"HR Operations, Communication",3-5 years,HR,HR executive managing recruitment and employee relations
+J5,Business Intelligence Analyst,"Power BI, SQL",2-4 years,IT,BI analyst responsible for dashboards and reporting
+J6,Frontend Developer,"HTML, CSS, JavaScript",1-3 years,IT,Frontend developer building responsive user interfaces
+J7,Backend Developer,"Python, Flask, APIs",2-4 years,IT,Backend developer creating REST APIs
+J8,Data Engineer,"Python, ETL, SQL",2-5 years,IT,Data engineer managing ETL pipelines
+J9,QA Engineer,"Testing, Automation",1-3 years,IT,QA engineer responsible for automated testing
+J10,AI Research Intern,"Python, AI",0-2 years,Data Science,Research intern working on AI models
