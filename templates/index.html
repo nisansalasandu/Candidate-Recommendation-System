@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Recommendation System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <i class="fas fa-users-cog"></i>
+                <h1>Candidate Recommendation System</h1>
+                <p class="subtitle">AI-Powered Talent Matching Using TF-IDF & Cosine Similarity</p>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('manual')">
+                <i class="fas fa-edit"></i> Manual Input
+            </button>
+            <button class="tab-button" onclick="showTab('file')">
+                <i class="fas fa-file-upload"></i> File Upload
+            </button>
+            <button class="tab-button" onclick="showTab('batch')">
+                <i class="fas fa-list"></i> Batch Process
+            </button>
+        </div>
+
+        <!-- Manual Input Tab -->
+        <div id="manual-tab" class="tab-content active">
+            <div class="section">
+                <h2><i class="fas fa-briefcase"></i> Job Description</h2>
+                <div class="form-group">
+                    <label>Required Skills *</label>
+                    <textarea id="job-skills" placeholder="e.g., Python, Machine Learning, TensorFlow, Data Analysis"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Experience Required</label>
+                    <textarea id="job-experience" placeholder="e.g., 3+ years in software development"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Education Required</label>
+                    <textarea id="job-education" placeholder="e.g., Bachelor's in Computer Science"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Full Job Description</label>
+                    <textarea id="job-description" rows="4" placeholder="Enter detailed job description..."></textarea>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2><i class="fas fa-user-tie"></i> Candidates</h2>
+                <div id="candidates-container">
+                    <!-- Candidate forms will be added here dynamically -->
+                </div>
+                <button class="btn btn-secondary" onclick="addCandidate()">
+                    <i class="fas fa-plus"></i> Add Candidate
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label>Top N Candidates to Recommend</label>
+                <input type="number" id="top-n" value="5" min="1" max="20">
+            </div>
+
+            <button class="btn btn-primary btn-large" onclick="getRecommendations()">
+                <i class="fas fa-robot"></i> Get Recommendations
+            </button>
+        </div>
+
+        <!-- File Upload Tab -->
+        <div id="file-tab" class="tab-content">
+            <div class="section">
+                <h2><i class="fas fa-cloud-upload-alt"></i> Upload CSV Files</h2>
+                <p class="info-text">
+                    <i class="fas fa-info-circle"></i> 
+                    Upload CSV files containing candidate CVs and job descriptions.
+                </p>
+
+                <div class="file-upload-area">
+                    <div class="file-upload-box">
+                        <i class="fas fa-file-csv"></i>
+                        <h3>Candidates CSV</h3>
+                        <p>Required columns: candidate_id, skills, experience, education, cv_text</p>
+                        <input type="file" id="cvs-file" accept=".csv" onchange="handleFileSelect('cvs')">
+                        <label for="cvs-file" class="file-label">Choose File</label>
+                        <div id="cvs-file-name" class="file-name"></div>
+                    </div>
+
+                    <div class="file-upload-box">
+                        <i class="fas fa-file-csv"></i>
+                        <h3>Jobs CSV</h3>
+                        <p>Required columns: job_id, required_skills, experience_required, education_required, job_description</p>
+                        <input type="file" id="jobs-file" accept=".csv" onchange="handleFileSelect('jobs')">
+                        <label for="jobs-file" class="file-label">Choose File</label>
+                        <div id="jobs-file-name" class="file-name"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Top N Candidates per Job</label>
+                    <input type="number" id="file-top-n" value="5" min="1" max="20">
+                </div>
+
+                <button class="btn btn-primary btn-large" onclick="uploadFiles()">
+                    <i class="fas fa-upload"></i> Upload & Process
+                </button>
+            </div>
+        </div>
+
+        <!-- Batch Process Tab -->
+        <div id="batch-tab" class="tab-content">
+            <div class="section">
+                <h2><i class="fas fa-cogs"></i> Batch Processing</h2>
+                <p class="info-text">
+                    <i class="fas fa-info-circle"></i> 
+                    Process multiple jobs against multiple candidates at once using JSON format.
+                </p>
+
+                <div class="form-group">
+                    <label>Jobs JSON</label>
+                    <textarea id="batch-jobs" rows="8" placeholder='[
+  {
+    "job_id": "J001",
+    "required_skills": "Python, ML",
+    "experience_required": "3+ years",
+    "education_required": "BS CS",
+    "job_description": "Data Scientist position"
+  }
+]'></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Candidates JSON</label>
+                    <textarea id="batch-candidates" rows="8" placeholder='[
+  {
+    "candidate_id": "C001",
+    "skills": "Python, TensorFlow",
+    "experience": "4 years as Data Scientist",
+    "education": "MS Computer Science",
+    "cv_text": "Experienced in ML models"
+  }
+]'></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Top N Candidates</label>
+                    <input type="number" id="batch-top-n" value="5" min="1" max="20">
+                </div>
+
+                <button class="btn btn-primary btn-large" onclick="batchProcess()">
+                    <i class="fas fa-play"></i> Process Batch
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="section" style="display: none;">
+            <h2><i class="fas fa-trophy"></i> Recommendation Results</h2>
+            <div id="results-stats" class="stats-container"></div>
+            <div id="results-container"></div>
+            <button class="btn btn-secondary" onclick="exportResults()">
+                <i class="fas fa-download"></i> Export Results (CSV)
+            </button>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Processing recommendations...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="error-message" style="display: none;"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
