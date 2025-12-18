@@ -1,40 +1,47 @@
-"""
-Flask Backend API for Candidate Recommendation System
-Provides endpoints for uploading CVs, Job Descriptions, and getting recommendations
-"""
-
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import pandas as pd
 import os
-import json
+from datetime import datetime
+from src.document_parser import DocumentParser
 from src.recommendation_pipeline import CandidateRecommendationPipeline
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
+CORS(app)
+
+# Configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'csv'}
 
 # Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Initialize the recommendation pipeline
+# Initialize parsers
+document_parser = DocumentParser()
+
+# Initialize recommendation pipeline
 try:
     pipeline = CandidateRecommendationPipeline(vectorizer_path='models/vectorizer.pkl')
-    print("✓ Recommendation pipeline initialized successfully")
+    print("✓ Recommendation pipeline initialized")
 except Exception as e:
-    print(f"✗ Error initializing pipeline: {str(e)}")
+    print(f"✗ Pipeline initialization error: {str(e)}")
     pipeline = None
 
-# Allowed file extensions
-ALLOWED_EXTENSIONS = {'csv', 'txt', 'pdf'}
+# Global storage
+cvs_data = []
+jobs_data = []
+
 
 def allowed_file(filename):
+    """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @app.route('/')
 def index():
-    """Render the main page"""
+    """Serve the main page"""
     return render_template('index.html')
 
 
@@ -43,230 +50,271 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'pipeline_loaded': pipeline is not None
+        'pipeline_loaded': pipeline is not None,
+        'supported_formats': ['pdf', 'docx', 'txt', 'csv']
     })
+
+
+@app.route('/api/upload-cv-file', methods=['POST'])
+def upload_cv_file():
+    """
+    Upload CV as document file (PDF, DOCX, TXT)
+    Extracts text automatically
+    """
+    try:
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file format. Use PDF, DOCX, or TXT'}), 400
+        
+        # Get form data
+        candidate_id = request.form.get('candidate_id')
+        name = request.form.get('name', 'Unknown')
+        
+        if not candidate_id:
+            return jsonify({'error': 'Candidate ID is required'}), 400
+        
+        # Save file
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"{candidate_id}_{timestamp}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(file_path)
+        
+        # Parse document
+        try:
+            extracted_text = document_parser.parse_file(file_path)
+            sections = document_parser.extract_sections(extracted_text)
+        except Exception as e:
+            os.remove(file_path)  # Clean up
+            return jsonify({'error': f'Failed to parse document: {str(e)}'}), 500
+        
+        # Create CV entry
+        cv_entry = {
+            'candidate_id': candidate_id,
+            'name': name,
+            'skills': sections.get('skills', ''),
+            'experience': sections.get('experience', ''),
+            'education': sections.get('education', ''),
+            'cv_text': sections.get('full_text', ''),
+            'filename': filename,
+            'upload_path': file_path,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Process with pipeline
+        if pipeline:
+            combined_text = f"{cv_entry['skills']} {cv_entry['experience']} {cv_entry['education']} {cv_entry['cv_text']}"
+            cv_entry['cleaned_text'] = pipeline.clean_text(combined_text)
+        
+        # Store
+        cvs_data.append(cv_entry)
+        
+        return jsonify({
+            'success': True,
+            'message': 'CV uploaded and processed successfully',
+            'candidate_id': candidate_id,
+            'extracted_sections': {
+                'skills': sections.get('skills', 'Not detected')[:200],
+                'experience': sections.get('experience', 'Not detected')[:200],
+                'education': sections.get('education', 'Not detected')[:200]
+            },
+            'text_length': len(extracted_text),
+            'total_cvs': len(cvs_data)
+        }), 201
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-job-file', methods=['POST'])
+def upload_job_file():
+    """
+    Upload Job Description as document file (PDF, DOCX, TXT)
+    Extracts text automatically
+    """
+    try:
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file format. Use PDF, DOCX, or TXT'}), 400
+        
+        # Get form data
+        job_id = request.form.get('job_id')
+        title = request.form.get('title', 'Unknown Position')
+        
+        if not job_id:
+            return jsonify({'error': 'Job ID is required'}), 400
+        
+        # Save file
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"{job_id}_{timestamp}_{filename}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(file_path)
+        
+        # Parse document
+        try:
+            extracted_text = document_parser.parse_file(file_path)
+            sections = document_parser.extract_sections(extracted_text)
+        except Exception as e:
+            os.remove(file_path)  # Clean up
+            return jsonify({'error': f'Failed to parse document: {str(e)}'}), 500
+        
+        # Create job entry
+        job_entry = {
+            'job_id': job_id,
+            'title': title,
+            'required_skills': sections.get('skills', ''),
+            'experience_required': sections.get('experience', ''),
+            'education_required': sections.get('education', ''),
+            'job_description': sections.get('full_text', ''),
+            'filename': filename,
+            'upload_path': file_path,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Process with pipeline
+        if pipeline:
+            combined_text = f"{job_entry['required_skills']} {job_entry['experience_required']} {job_entry['education_required']} {job_entry['job_description']}"
+            job_entry['cleaned_text'] = pipeline.clean_text(combined_text)
+        
+        # Store
+        jobs_data.append(job_entry)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Job description uploaded and processed successfully',
+            'job_id': job_id,
+            'extracted_sections': {
+                'skills': sections.get('skills', 'Not detected')[:200],
+                'experience': sections.get('experience', 'Not detected')[:200],
+                'education': sections.get('education', 'Not detected')[:200]
+            },
+            'text_length': len(extracted_text),
+            'total_jobs': len(jobs_data)
+        }), 201
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/recommend', methods=['POST'])
 def recommend():
-    """
-    Main recommendation endpoint
-    Accepts job description and list of CVs, returns ranked candidates
-    
-    Expected JSON format:
-    {
-        "job": {
-            "required_skills": "...",
-            "experience_required": "...",
-            "education_required": "...",
-            "job_description": "..."
-        },
-        "candidates": [
-            {
-                "candidate_id": "...",
-                "skills": "...",
-                "experience": "...",
-                "education": "...",
-                "cv_text": "..."
-            }
-        ],
-        "top_n": 5
-    }
-    """
-    if pipeline is None:
-        return jsonify({'error': 'Recommendation pipeline not initialized'}), 500
-    
+    """Generate recommendations"""
     try:
-        data = request.get_json()
-        
-        if not data or 'job' not in data or 'candidates' not in data:
-            return jsonify({'error': 'Invalid request format. Required: job, candidates'}), 400
-        
-        job_data = data['job']
-        candidates_data = data['candidates']
+        data = request.json
+        job_id = data.get('job_id', None)
         top_n = data.get('top_n', 5)
         
-        if len(candidates_data) == 0:
-            return jsonify({'error': 'No candidates provided'}), 400
+        if len(cvs_data) == 0:
+            return jsonify({'error': 'No CVs uploaded yet'}), 400
         
-        # Get recommendations
-        recommendations = pipeline.recommend_candidates(
-            job_data=job_data,
-            cv_data_list=candidates_data,
-            top_n=min(top_n, len(candidates_data))
-        )
+        if len(jobs_data) == 0:
+            return jsonify({'error': 'No jobs uploaded yet'}), 400
         
-        return jsonify({
-            'success': True,
-            'total_candidates': len(candidates_data),
-            'recommendations': recommendations
-        })
-    
-    except Exception as e:
-        return jsonify({'error': f'Recommendation failed: {str(e)}'}), 500
-
-
-@app.route('/api/recommend/file', methods=['POST'])
-def recommend_from_files():
-    """
-    Recommendation endpoint for CSV file uploads
-    Accepts CSV files for CVs and Jobs
-    
-    Expected form data:
-    - cvs_file: CSV file with candidate data
-    - jobs_file: CSV file with job descriptions
-    - top_n: Number of top candidates (optional, default=5)
-    """
-    if pipeline is None:
-        return jsonify({'error': 'Recommendation pipeline not initialized'}), 500
-    
-    try:
-        # Check if files are present
-        if 'cvs_file' not in request.files or 'jobs_file' not in request.files:
-            return jsonify({'error': 'Both cvs_file and jobs_file are required'}), 400
-        
-        cvs_file = request.files['cvs_file']
-        jobs_file = request.files['jobs_file']
-        top_n = int(request.form.get('top_n', 5))
-        
-        if cvs_file.filename == '' or jobs_file.filename == '':
-            return jsonify({'error': 'No files selected'}), 400
-        
-        # Read CSV files
-        cvs_df = pd.read_csv(cvs_file)
-        jobs_df = pd.read_csv(jobs_file)
-        
-        # Validate required columns for CVs
-        required_cv_cols = ['candidate_id']
-        if not all(col in cvs_df.columns for col in required_cv_cols):
-            return jsonify({'error': f'CVs CSV must contain: {required_cv_cols}'}), 400
-        
-        # Validate required columns for Jobs
-        required_job_cols = ['job_id']
-        if not all(col in jobs_df.columns for col in required_job_cols):
-            return jsonify({'error': f'Jobs CSV must contain: {required_job_cols}'}), 400
-        
-        # Batch process recommendations
-        recommendations_df = pipeline.batch_recommend(jobs_df, cvs_df, top_n=top_n)
-        
-        # Convert to JSON-friendly format
-        recommendations = recommendations_df.to_dict('records')
-        
-        return jsonify({
-            'success': True,
-            'total_jobs': len(jobs_df),
-            'total_candidates': len(cvs_df),
-            'recommendations': recommendations
-        })
-    
-    except Exception as e:
-        return jsonify({'error': f'File processing failed: {str(e)}'}), 500
-
-
-@app.route('/api/process/cv', methods=['POST'])
-def process_single_cv():
-    """
-    Process a single CV and return cleaned text
-    Useful for debugging/testing
-    """
-    if pipeline is None:
-        return jsonify({'error': 'Pipeline not initialized'}), 500
-    
-    try:
-        data = request.get_json()
-        
-        cleaned_text = pipeline.process_cv(
-            skills=data.get('skills', ''),
-            experience=data.get('experience', ''),
-            education=data.get('education', ''),
-            cv_text=data.get('cv_text', '')
-        )
-        
-        return jsonify({
-            'success': True,
-            'cleaned_text': cleaned_text
-        })
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/process/job', methods=['POST'])
-def process_single_job():
-    """
-    Process a single job description and return cleaned text
-    Useful for debugging/testing
-    """
-    if pipeline is None:
-        return jsonify({'error': 'Pipeline not initialized'}), 500
-    
-    try:
-        data = request.get_json()
-        
-        cleaned_text = pipeline.process_job(
-            required_skills=data.get('required_skills', ''),
-            experience_required=data.get('experience_required', ''),
-            education_required=data.get('education_required', ''),
-            job_description=data.get('job_description', '')
-        )
-        
-        return jsonify({
-            'success': True,
-            'cleaned_text': cleaned_text
-        })
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/batch/recommend', methods=['POST'])
-def batch_recommend():
-    """
-    Batch recommendation for multiple jobs and candidates
-    More efficient than calling /api/recommend multiple times
-    """
-    if pipeline is None:
-        return jsonify({'error': 'Pipeline not initialized'}), 500
-    
-    try:
-        data = request.get_json()
-        jobs = data.get('jobs', [])
-        candidates = data.get('candidates', [])
-        top_n = data.get('top_n', 5)
-        
-        if not jobs or not candidates:
-            return jsonify({'error': 'Both jobs and candidates are required'}), 400
+        if not pipeline:
+            return jsonify({'error': 'Pipeline not initialized'}), 500
         
         # Convert to DataFrames
-        jobs_df = pd.DataFrame(jobs)
-        cvs_df = pd.DataFrame(candidates)
+        cvs_df = pd.DataFrame(cvs_data)
+        jobs_df = pd.DataFrame(jobs_data)
         
-        # Process batch
+        # Filter for specific job if requested
+        if job_id:
+            jobs_df = jobs_df[jobs_df['job_id'] == job_id]
+            if len(jobs_df) == 0:
+                return jsonify({'error': f'Job ID {job_id} not found'}), 404
+        
+        # Get recommendations
         recommendations_df = pipeline.batch_recommend(jobs_df, cvs_df, top_n=top_n)
         
         return jsonify({
             'success': True,
-            'total_jobs': len(jobs),
-            'total_candidates': len(candidates),
-            'recommendations': recommendations_df.to_dict('records')
-        })
+            'recommendations': recommendations_df.to_dict('records'),
+            'total_candidates': len(cvs_data),
+            'total_jobs': len(jobs_df),
+            'timestamp': datetime.now().isoformat()
+        }), 200
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/cvs', methods=['GET'])
+def get_cvs():
+    """Get all uploaded CVs"""
+    return jsonify({
+        'cvs': cvs_data,
+        'total': len(cvs_data)
+    }), 200
+
+
+@app.route('/api/jobs', methods=['GET'])
+def get_jobs():
+    """Get all uploaded jobs"""
+    return jsonify({
+        'jobs': jobs_data,
+        'total': len(jobs_data)
+    }), 200
+
+
+@app.route('/api/clear', methods=['POST'])
+def clear_data():
+    """Clear all data and uploaded files"""
+    global cvs_data, jobs_data
+    
+    # Delete uploaded files
+    for cv in cvs_data:
+        if 'upload_path' in cv and os.path.exists(cv['upload_path']):
+            try:
+                os.remove(cv['upload_path'])
+            except:
+                pass
+    
+    for job in jobs_data:
+        if 'upload_path' in job and os.path.exists(job['upload_path']):
+            try:
+                os.remove(job['upload_path'])
+            except:
+                pass
+    
+    cvs_data = []
+    jobs_data = []
+    
+    return jsonify({'message': 'All data cleared successfully'}), 200
 
 
 if __name__ == '__main__':
-    print("\n" + "="*60)
-    print("   Candidate Recommendation System - Backend Server")
-    print("="*60)
-    print("\nEndpoints available:")
-    print("  GET  /                      - Web interface")
-    print("  GET  /api/health            - Health check")
-    print("  POST /api/recommend         - Single job recommendation")
-    print("  POST /api/recommend/file    - Upload CSV files")
-    print("  POST /api/batch/recommend   - Batch recommendations")
-    print("  POST /api/process/cv        - Process single CV")
-    print("  POST /api/process/job       - Process single job")
-    print("\n" + "="*60 + "\n")
+    print("\n" + "="*70)
+    print("   🚀 Enhanced Candidate Recommendation System")
+    print("="*70)
+    print("\n📁 Supported Formats: PDF, DOCX, TXT, CSV")
+    print("🔍 Automatic text extraction and section detection")
+    print("\nEndpoints:")
+    print("  GET  /                       - Web interface")
+    print("  GET  /api/health             - Health check")
+    print("  POST /api/upload-cv-file     - Upload CV document")
+    print("  POST /api/upload-job-file    - Upload job document")
+    print("  POST /api/recommend          - Get recommendations")
+    print("  GET  /api/cvs                - List all CVs")
+    print("  GET  /api/jobs               - List all jobs")
+    print("  POST /api/clear              - Clear all data")
+    print("\n" + "="*70)
+    print(f"\n🌐 Server starting at: http://localhost:5000\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)

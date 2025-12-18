@@ -1,8 +1,3 @@
-"""
-Flask Backend API for Candidate Recommendation System
-Provides endpoints for uploading CVs, Job Descriptions, and getting recommendations
-"""
-
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import pandas as pd
