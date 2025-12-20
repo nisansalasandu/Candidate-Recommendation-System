@@ -1,317 +1,230 @@
-"""
-recommendation_pipeline.py
-Complete pipeline for candidate recommendation using trained models
-"""
-
 import pandas as pd
 import numpy as np
-import pickle
-import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
-# Download required NLTK data (silent mode)
-try:
-    stopwords.words('english')
-except LookupError:
-    nltk.download('stopwords', quiet=True)
-    nltk.download('punkt', quiet=True)
-    nltk.download('punkt_tab', quiet=True)
-    nltk.download('wordnet', quiet=True)
-
-# Initialize lemmatizer and stopwords
-lemmatizer = WordNetLemmatizer()
-stop_words = set(stopwords.words('english'))
+import re
+import pickle
+import os
 
 
 class CandidateRecommendationPipeline:
-    """
-    Complete pipeline for candidate recommendation system
-    Loads trained models and provides real-time recommendations
-    """
-    
-    def __init__(self, vectorizer_path='models/vectorizer.pkl'):
-        """Initialize the pipeline by loading the trained vectorizer"""
-        self.vectorizer = None
-        self.vectorizer_path = vectorizer_path
-        self.load_vectorizer()
-    
-    def load_vectorizer(self):
-        """Load the trained TF-IDF vectorizer from pickle file"""
-        try:
-            with open(self.vectorizer_path, 'rb') as f:
+    def __init__(self, vectorizer_path=None):
+        """
+        Initialize the recommendation pipeline
+        
+        Args:
+            vectorizer_path: Path to saved vectorizer (optional)
+        """
+        if vectorizer_path and os.path.exists(vectorizer_path):
+            with open(vectorizer_path, 'rb') as f:
                 self.vectorizer = pickle.load(f)
-            print(f"✓ Vectorizer loaded successfully from {self.vectorizer_path}")
-        except FileNotFoundError:
-            raise Exception(f"Vectorizer not found at {self.vectorizer_path}. Please train the model first.")
-        except Exception as e:
-            raise Exception(f"Error loading vectorizer: {str(e)}")
+            print(f"✓ Loaded vectorizer from {vectorizer_path}")
+        else:
+            # Initialize new vectorizer with optimized parameters
+            self.vectorizer = TfidfVectorizer(
+                max_features=5000,
+                ngram_range=(1, 2),
+                stop_words='english',
+                min_df=1,
+                max_df=0.95
+            )
+            print("✓ Initialized new TF-IDF vectorizer")
     
     def clean_text(self, text):
         """
-        Clean and preprocess text using the same method as training
+        Clean and preprocess text
         
-        Steps:
-        1. Convert to lowercase
-        2. Remove punctuation and numbers
-        3. Tokenize
-        4. Remove stopwords
-        5. Lemmatize
+        Args:
+            text: Input text string
+            
+        Returns:
+            Cleaned text string
         """
-        if pd.isna(text) or text == "":
+        if not isinstance(text, str):
             return ""
         
-        # Lowercase
-        text = str(text).lower()
+        # Convert to lowercase
+        text = text.lower()
         
-        # Remove punctuation and numbers
-        text = re.sub(r'[^a-z\s]', '', text)
+        # Remove special characters but keep spaces
+        text = re.sub(r'[^a-zA-Z0-9\s]', ' ', text)
         
-        # Tokenize
-        words = nltk.word_tokenize(text)
+        # Remove extra whitespace
+        text = ' '.join(text.split())
         
-        # Remove stopwords
-        words = [w for w in words if w not in stop_words]
-        
-        # Lemmatize
-        words = [lemmatizer.lemmatize(w) for w in words]
-        
-        # Join back into string
-        return ' '.join(words)
+        return text
     
-    def process_cv(self, skills='', experience='', education='', cv_text=''):
+    def calculate_similarity(self, job_texts, cv_texts):
         """
-        Process a single CV and return cleaned text
+        Calculate cosine similarity between job descriptions and CVs
         
         Args:
-            skills: Skills text
-            experience: Experience text
-            education: Education text
-            cv_text: Full CV text
-        
-        Returns:
-            Cleaned and processed text
-        """
-        # Combine all fields
-        combined = f"{skills} {experience} {education} {cv_text}"
-        
-        # Clean the text
-        cleaned = self.clean_text(combined)
-        
-        return cleaned
-    
-    def process_job(self, required_skills='', experience_required='', 
-                   education_required='', job_description=''):
-        """
-        Process a single job description and return cleaned text
-        
-        Args:
-            required_skills: Required skills
-            experience_required: Experience requirements
-            education_required: Education requirements
-            job_description: Full job description
-        
-        Returns:
-            Cleaned and processed text
-        """
-        # Combine all fields
-        combined = f"{required_skills} {experience_required} {education_required} {job_description}"
-        
-        # Clean the text
-        cleaned = self.clean_text(combined)
-        
-        return cleaned
-    
-    def vectorize_text(self, text):
-        """
-        Convert cleaned text to TF-IDF vector using trained vectorizer
-        
-        Args:
-            text: Cleaned text string
-        
-        Returns:
-            TF-IDF vector (sparse matrix)
-        """
-        if self.vectorizer is None:
-            raise Exception("Vectorizer not loaded. Call load_vectorizer() first.")
-        
-        return self.vectorizer.transform([text])
-    
-    def compute_similarity(self, cv_vectors, job_vectors):
-        """
-        Compute cosine similarity between CVs and job descriptions
-        
-        Args:
-            cv_vectors: CV vectors (sparse matrix or array)
-            job_vectors: Job vectors (sparse matrix or array)
-        
-        Returns:
-            Similarity matrix (numpy array)
-        """
-        return cosine_similarity(job_vectors, cv_vectors)
-    
-    def recommend_candidates(self, job_data, cv_data_list, top_n=5):
-        """
-        Recommend top N candidates for a given job
-        
-        Args:
-            job_data: Dictionary with job fields
-                     {required_skills, experience_required, education_required, job_description}
-            cv_data_list: List of dictionaries with CV fields
-                         [{candidate_id, skills, experience, education, cv_text}, ...]
-            top_n: Number of top candidates to recommend
-        
-        Returns:
-            List of dictionaries with recommendations
-            [{candidate_id, similarity_score, rank}, ...]
-        """
-        # Process job description
-        job_cleaned = self.process_job(
-            required_skills=job_data.get('required_skills', ''),
-            experience_required=job_data.get('experience_required', ''),
-            education_required=job_data.get('education_required', ''),
-            job_description=job_data.get('job_description', '')
-        )
-        
-        # Vectorize job
-        job_vector = self.vectorize_text(job_cleaned)
-        
-        # Process and vectorize all CVs
-        cv_vectors_list = []
-        candidate_ids = []
-        
-        for cv_data in cv_data_list:
-            cv_cleaned = self.process_cv(
-                skills=cv_data.get('skills', ''),
-                experience=cv_data.get('experience', ''),
-                education=cv_data.get('education', ''),
-                cv_text=cv_data.get('cv_text', '')
-            )
+            job_texts: List of job description texts
+            cv_texts: List of CV texts
             
-            cv_vector = self.vectorize_text(cv_cleaned)
-            cv_vectors_list.append(cv_vector)
-            candidate_ids.append(cv_data.get('candidate_id', f"CV_{len(candidate_ids)+1}"))
+        Returns:
+            Similarity matrix (jobs x CVs)
+        """
+        # Combine all texts for fitting
+        all_texts = job_texts + cv_texts
         
-        # Stack CV vectors
-        from scipy.sparse import vstack
-        cv_vectors = vstack(cv_vectors_list)
+        # Fit and transform
+        tfidf_matrix = self.vectorizer.fit_transform(all_texts)
         
-        # Compute similarity
-        similarity_scores = self.compute_similarity(cv_vectors, job_vector)
-        scores = similarity_scores[0]  # Get scores for the single job
+        # Split back into job and CV matrices
+        n_jobs = len(job_texts)
+        job_vectors = tfidf_matrix[:n_jobs]
+        cv_vectors = tfidf_matrix[n_jobs:]
         
-        # Get top N candidates
-        top_indices = np.argsort(scores)[::-1][:top_n]
+        # Calculate cosine similarity
+        similarity_matrix = cosine_similarity(job_vectors, cv_vectors)
         
-        # Build recommendations
-        recommendations = []
-        for rank, idx in enumerate(top_indices, start=1):
-            recommendations.append({
-                'candidate_id': candidate_ids[idx],
-                'similarity_score': float(round(scores[idx], 4)),
-                'rank': rank,
-                'match_percentage': float(round(scores[idx] * 100, 2))
+        return similarity_matrix
+    
+    def recommend_candidates(self, job_row, cvs_df, top_n=5):
+        """
+        Recommend top candidates for a single job
+        
+        Args:
+            job_row: Single job row from DataFrame
+            cvs_df: DataFrame of all CVs
+            top_n: Number of top candidates to return
+            
+        Returns:
+            DataFrame of top candidates with similarity scores
+        """
+        # Prepare texts
+        job_text = job_row.get('cleaned_text', '')
+        if not job_text:
+            # Fallback to combining all job fields
+            job_text = f"{job_row.get('required_skills', '')} {job_row.get('experience_required', '')} {job_row.get('education_required', '')} {job_row.get('job_description', '')}"
+            job_text = self.clean_text(job_text)
+        
+        cv_texts = []
+        for _, cv in cvs_df.iterrows():
+            cv_text = cv.get('cleaned_text', '')
+            if not cv_text:
+                # Fallback to combining all CV fields
+                cv_text = f"{cv.get('skills', '')} {cv.get('experience', '')} {cv.get('education', '')} {cv.get('cv_text', '')}"
+                cv_text = self.clean_text(cv_text)
+            cv_texts.append(cv_text)
+        
+        # Calculate similarities
+        similarity_matrix = self.calculate_similarity([job_text], cv_texts)
+        similarities = similarity_matrix[0]
+        
+        # Get top candidates
+        top_indices = np.argsort(similarities)[::-1][:top_n]
+        
+        # Create results DataFrame
+        results = []
+        for idx in top_indices:
+            cv_row = cvs_df.iloc[idx]
+            results.append({
+                'job_id': job_row['job_id'],
+                'job_title': job_row['title'],
+                'candidate_id': cv_row['candidate_id'],
+                'candidate_name': cv_row['name'],
+                'similarity_score': float(similarities[idx])
             })
         
-        return recommendations
+        return pd.DataFrame(results)
     
     def batch_recommend(self, jobs_df, cvs_df, top_n=5):
         """
-        Process batch recommendations from DataFrames
+        Generate recommendations for all jobs
         
         Args:
-            jobs_df: DataFrame with job descriptions
-            cvs_df: DataFrame with candidate CVs
+            jobs_df: DataFrame of all jobs
+            cvs_df: DataFrame of all CVs
             top_n: Number of top candidates per job
-        
+            
         Returns:
-            DataFrame with all recommendations
+            DataFrame of all recommendations
         """
         all_recommendations = []
         
-        # Process all CVs
-        cv_vectors_list = []
-        for _, cv in cvs_df.iterrows():
-            cv_cleaned = self.process_cv(
-                skills=cv.get('skills', ''),
-                experience=cv.get('experience', ''),
-                education=cv.get('education', ''),
-                cv_text=cv.get('cv_text', '')
-            )
-            cv_vector = self.vectorize_text(cv_cleaned)
-            cv_vectors_list.append(cv_vector)
+        for _, job_row in jobs_df.iterrows():
+            job_recommendations = self.recommend_candidates(job_row, cvs_df, top_n)
+            all_recommendations.append(job_recommendations)
         
-        # Stack CV vectors
-        from scipy.sparse import vstack
-        cv_vectors = vstack(cv_vectors_list)
+        # Combine all recommendations
+        if all_recommendations:
+            return pd.concat(all_recommendations, ignore_index=True)
+        else:
+            return pd.DataFrame()
+    
+    def save_vectorizer(self, path):
+        """
+        Save the trained vectorizer
         
-        # Process each job
-        for _, job in jobs_df.iterrows():
-            job_cleaned = self.process_job(
-                required_skills=job.get('required_skills', ''),
-                experience_required=job.get('experience_required', ''),
-                education_required=job.get('education_required', ''),
-                job_description=job.get('job_description', '')
-            )
-            
-            job_vector = self.vectorize_text(job_cleaned)
-            
-            # Compute similarity
-            similarity_scores = self.compute_similarity(cv_vectors, job_vector)
-            scores = similarity_scores[0]
-            
-            # Get top N candidates
-            top_indices = np.argsort(scores)[::-1][:top_n]
-            
-            # Build recommendations for this job
-            for rank, idx in enumerate(top_indices, start=1):
-                all_recommendations.append({
-                    'job_id': job['job_id'],
-                    'candidate_id': cvs_df.iloc[idx]['candidate_id'],
-                    'similarity_score': round(scores[idx], 4),
-                    'rank': rank,
-                    'match_percentage': round(scores[idx] * 100, 2)
-                })
+        Args:
+            path: Path to save the vectorizer
+        """
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            pickle.dump(self.vectorizer, f)
+        print(f"✓ Saved vectorizer to {path}")
+    
+    def get_top_keywords(self, text, n=10):
+        """
+        Extract top keywords from text using TF-IDF
         
-        return pd.DataFrame(all_recommendations)
+        Args:
+            text: Input text
+            n: Number of top keywords to return
+            
+        Returns:
+            List of top keywords
+        """
+        # Transform text
+        tfidf_vector = self.vectorizer.transform([self.clean_text(text)])
+        
+        # Get feature names
+        feature_names = self.vectorizer.get_feature_names_out()
+        
+        # Get top features
+        top_indices = tfidf_vector.toarray()[0].argsort()[-n:][::-1]
+        top_keywords = [feature_names[i] for i in top_indices if tfidf_vector.toarray()[0][i] > 0]
+        
+        return top_keywords
 
 
 # Example usage
 if __name__ == "__main__":
+    # Example data
+    jobs_data = {
+        'job_id': ['J1', 'J2'],
+        'title': ['Python Developer', 'Data Scientist'],
+        'required_skills': ['Python Django Flask', 'Python Machine Learning'],
+        'experience_required': ['3 years', '5 years'],
+        'education_required': ['Bachelor', 'Master'],
+        'job_description': ['Develop web applications', 'Build ML models']
+    }
+    
+    cvs_data = {
+        'candidate_id': ['C1', 'C2', 'C3'],
+        'name': ['Alice', 'Bob', 'Charlie'],
+        'skills': ['Python Django', 'Python ML TensorFlow', 'Java Spring'],
+        'experience': ['4 years web dev', '6 years data science', '2 years backend'],
+        'education': ['Bachelor CS', 'Master AI', 'Bachelor IT'],
+        'cv_text': ['Full stack developer', 'ML engineer', 'Backend developer']
+    }
+    
+    jobs_df = pd.DataFrame(jobs_data)
+    cvs_df = pd.DataFrame(cvs_data)
+    
     # Initialize pipeline
     pipeline = CandidateRecommendationPipeline()
     
-    # Example: Single job with multiple candidates
-    job = {
-        'required_skills': 'Python, Machine Learning, Data Science',
-        'experience_required': '3+ years in software development',
-        'education_required': 'Bachelor in Computer Science',
-        'job_description': 'Looking for a data scientist with strong Python skills'
-    }
-    
-    candidates = [
-        {
-            'candidate_id': 'C001',
-            'skills': 'Python, TensorFlow, Machine Learning',
-            'experience': '4 years as Data Scientist',
-            'education': 'MS in Computer Science',
-            'cv_text': 'Experienced in building ML models and data pipelines'
-        },
-        {
-            'candidate_id': 'C002',
-            'skills': 'Java, Spring Boot, Microservices',
-            'experience': '2 years as Backend Developer',
-            'education': 'BS in Software Engineering',
-            'cv_text': 'Backend developer with Java expertise'
-        }
-    ]
+    # Clean texts
+    for df in [jobs_df, cvs_df]:
+        df['cleaned_text'] = df.apply(
+            lambda row: pipeline.clean_text(' '.join([str(v) for v in row.values])),
+            axis=1
+        )
     
     # Get recommendations
-    recommendations = pipeline.recommend_candidates(job, candidates, top_n=2)
-    
-    print("\n=== Candidate Recommendations ===")
-    for rec in recommendations:
-        print(f"Rank {rec['rank']}: {rec['candidate_id']} - "
-              f"Score: {rec['similarity_score']} ({rec['match_percentage']}%)")
+    recommendations = pipeline.batch_recommend(jobs_df, cvs_df, top_n=2)
+    print("\nRecommendations:")
+    print(recommendations)
