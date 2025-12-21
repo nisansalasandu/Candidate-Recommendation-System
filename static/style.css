@@ -381,7 +381,58 @@ body {
 
 /* Job Results */
 .job-results {
-    margin-bottom: 30px;
+    margin-bottom: 40px;
+    background: #f8f9fa;
+    padding: 25px;
+    border-radius: 12px;
+    border: 2px solid #e9ecef;
+}
+
+.job-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.job-header h3 {
+    color: white;
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.job-header h3 i {
+    color: white;
+    font-size: 24px;
+}
+
+.job-id {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.match-count {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .job-results h3 {
@@ -434,11 +485,29 @@ body {
 
 .candidate-info h4 {
     color: var(--dark);
-    margin-bottom: 15px;
+    margin-bottom: 5px;
     font-size: 18px;
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.candidate-id {
+    font-size: 12px;
+    color: var(--gray);
+    margin-bottom: 15px;
+    display: block;
+}
+
+.candidate-summary {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 6px;
+    margin: 15px 0;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.6;
+    border-left: 3px solid var(--primary-color);
 }
 
 .score-container {

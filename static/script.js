@@ -278,8 +278,6 @@ async function batchProcess() {
 
 // Display results
 function displayResults(data) {
-    recommendationsData = data.recommendations;
-    
     const resultsSection = document.getElementById('results-section');
     const statsContainer = document.getElementById('results-stats');
     const resultsContainer = document.getElementById('results-container');
@@ -287,81 +285,101 @@ function displayResults(data) {
     // Show results section
     resultsSection.style.display = 'block';
     
+    // Handle both old format (recommendations) and new format (jobs)
+    const jobs = data.jobs || [];
+    const totalJobs = data.total_jobs || jobs.length || 1;
+    const totalCandidates = data.total_candidates || 0;
+    
+    // Count total matches across all jobs
+    let totalMatches = 0;
+    if (jobs.length > 0) {
+        totalMatches = jobs.reduce((sum, job) => sum + (job.candidates ? job.candidates.length : 0), 0);
+        recommendationsData = jobs.flatMap(job => 
+            (job.candidates || []).map(c => ({...c, job_id: job.job_id, job_title: job.job_title}))
+        );
+    } else if (data.recommendations) {
+        // Fallback for old format
+        recommendationsData = data.recommendations;
+        totalMatches = recommendationsData.length;
+    }
+    
     // Display stats
     statsContainer.innerHTML = `
         <div class="stat-card">
             <i class="fas fa-briefcase"></i>
-            <div class="stat-value">${data.total_jobs || 1}</div>
-            <div class="stat-label">Jobs Processed</div>
+            <div class="stat-value">${totalJobs}</div>
+            <div class="stat-label">Job${totalJobs > 1 ? 's' : ''} Processed</div>
         </div>
         <div class="stat-card">
             <i class="fas fa-users"></i>
-            <div class="stat-value">${data.total_candidates}</div>
+            <div class="stat-value">${totalCandidates}</div>
             <div class="stat-label">Total Candidates</div>
         </div>
         <div class="stat-card">
             <i class="fas fa-star"></i>
-            <div class="stat-value">${recommendationsData.length}</div>
-            <div class="stat-label">Matches Found</div>
+            <div class="stat-value">${totalMatches}</div>
+            <div class="stat-label">Total Matches</div>
         </div>
     `;
     
-    // Display recommendations
-    if (recommendationsData.length === 0) {
+    // Display recommendations grouped by job
+    if (jobs.length === 0 && (!recommendationsData || recommendationsData.length === 0)) {
         resultsContainer.innerHTML = '<p class="no-results">No recommendations found</p>';
         return;
     }
     
-    // Group by job_id if present
-    const groupedResults = {};
-    recommendationsData.forEach(rec => {
-        const jobId = rec.job_id || 'Job';
-        if (!groupedResults[jobId]) {
-            groupedResults[jobId] = [];
-        }
-        groupedResults[jobId].push(rec);
-    });
-    
     let html = '';
-    for (const [jobId, recommendations] of Object.entries(groupedResults)) {
-        html += `
-            <div class="job-results">
-                <h3><i class="fas fa-briefcase"></i> ${jobId}</h3>
-                <div class="recommendations-grid">
-        `;
-        
-        recommendations.forEach(rec => {
-            const scorePercent = rec.match_percentage || (rec.similarity_score * 100);
-            const scoreColor = scorePercent >= 70 ? '#27ae60' : scorePercent >= 50 ? '#f39c12' : '#e74c3c';
+    
+    // Display results grouped by job
+    if (jobs.length > 0) {
+        jobs.forEach((job, jobIndex) => {
+            const candidates = job.candidates || [];
             
             html += `
-                <div class="recommendation-card">
-                    <div class="rank-badge rank-${rec.rank}">
-                        <i class="fas fa-medal"></i> Rank ${rec.rank}
+                <div class="job-results">
+                    <div class="job-header">
+                        <h3><i class="fas fa-briefcase"></i> ${job.job_title}</h3>
+                        <span class="job-id">Job ID: ${job.job_id}</span>
+                        <span class="match-count">${candidates.length} Candidate${candidates.length !== 1 ? 's' : ''} Matched</span>
                     </div>
-                    <div class="candidate-info">
-                        <h4><i class="fas fa-user"></i> ${rec.candidate_id}</h4>
-                        <div class="score-container">
-                            <div class="score-bar">
-                                <div class="score-fill" style="width: ${scorePercent}%; background: ${scoreColor}"></div>
-                            </div>
-                            <div class="score-text">
-                                <span class="score-value" style="color: ${scoreColor}">${scorePercent.toFixed(2)}%</span>
-                                <span class="score-label">Match Score</span>
-                            </div>
+                    <div class="recommendations-grid">
+            `;
+            
+            candidates.forEach(candidate => {
+                const scorePercent = candidate.match_percentage || (candidate.similarity_score * 100);
+                const scoreColor = scorePercent >= 70 ? '#27ae60' : scorePercent >= 50 ? '#f39c12' : '#e74c3c';
+                
+                html += `
+                    <div class="recommendation-card">
+                        <div class="rank-badge rank-${candidate.rank}">
+                            <i class="fas fa-medal"></i> Rank ${candidate.rank}
                         </div>
-                        <div class="similarity-score">
-                            Cosine Similarity: ${rec.similarity_score.toFixed(4)}
+                        <div class="candidate-info">
+                            <h4><i class="fas fa-user"></i> ${candidate.name || candidate.candidate_id}</h4>
+                            <p class="candidate-id">ID: ${candidate.candidate_id}</p>
+                            <div class="score-container">
+                                <div class="score-bar">
+                                    <div class="score-fill" style="width: ${scorePercent}%; background: ${scoreColor}"></div>
+                                </div>
+                                <div class="score-text">
+                                    <span class="score-value" style="color: ${scoreColor}">${scorePercent.toFixed(2)}%</span>
+                                    <span class="score-label">Match Score</span>
+                                </div>
+                            </div>
+                            <div class="similarity-score">
+                                Cosine Similarity: ${candidate.similarity_score.toFixed(4)}
+                            </div>
+                            ${candidate.summary ? `<div class="candidate-summary">${candidate.summary}</div>` : ''}
                         </div>
+                    </div>
+                `;
+            });
+            
+            html += `
                     </div>
                 </div>
             `;
         });
-        
-        html += `
-                </div>
-            </div>
-        `;
     }
     
     resultsContainer.innerHTML = html;

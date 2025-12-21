@@ -304,39 +304,53 @@ def recommend():
             if len(jobs_df) == 0:
                 return jsonify({'error': f'Job ID {job_id} not found'}), 404
         
-        # Get all recommendations (rank all CVs)
+        # Get all recommendations (rank all CVs for each job)
         recommendations_df = pipeline.batch_recommend(jobs_df, cvs_df, top_n=len(cvs_df))
         
-        # Add ranking
-        recommendations_df['rank'] = range(1, len(recommendations_df) + 1)
+        # Group recommendations by job and format response
+        job_recommendations = []
         
-        # Generate summary for each candidate
-        recommendations_list = []
-        for _, row in recommendations_df.iterrows():
-            # Find the CV data
-            cv = next((c for c in cvs_data if c['candidate_id'] == row['candidate_id']), None)
+        for _, job in jobs_df.iterrows():
+            # Get recommendations for this job
+            job_recs = recommendations_df[recommendations_df['job_id'] == job['job_id']]
             
-            # Get candidate name from either the row or the CV data
-            candidate_name = row.get('candidate_name', cv['name'] if cv else 'Unknown')
+            # Sort by similarity score (already ranked by batch_recommend)
+            job_recs = job_recs.sort_values('similarity_score', ascending=False).reset_index(drop=True)
             
-            summary = generate_candidate_summary(cv, row['similarity_score'])
+            # Generate summary for each candidate
+            candidates_list = []
+            for idx, row in job_recs.iterrows():
+                # Find the CV data
+                cv = next((c for c in cvs_data if c['candidate_id'] == row['candidate_id']), None)
+                
+                # Get candidate name from CV data
+                candidate_name = cv['name'] if cv else 'Unknown'
+                
+                summary = generate_candidate_summary(cv, row['similarity_score'])
+                
+                candidates_list.append({
+                    'rank': idx + 1,
+                    'candidate_id': row['candidate_id'],
+                    'name': candidate_name,
+                    'similarity_score': round(row['similarity_score'], 4),
+                    'match_percentage': round(row['similarity_score'] * 100, 2),
+                    'summary': summary,
+                    'skills': cv['skills'][:300] if cv else '',
+                    'experience': cv['experience'][:300] if cv else '',
+                    'education': cv['education'][:200] if cv else ''
+                })
             
-            recommendations_list.append({
-                'rank': row['rank'],
-                'candidate_id': row['candidate_id'],
-                'name': candidate_name,
-                'similarity_score': round(row['similarity_score'], 4),
-                'match_percentage': round(row['similarity_score'] * 100, 2),
-                'summary': summary,
-                'skills': cv['skills'][:300] if cv else '',
-                'experience': cv['experience'][:300] if cv else '',
-                'education': cv['education'][:200] if cv else ''
+            job_recommendations.append({
+                'job_id': job['job_id'],
+                'job_title': job['title'],
+                'candidates': candidates_list,
+                'total_matches': len(candidates_list)
             })
         
         return jsonify({
             'success': True,
-            'job_title': jobs_df.iloc[0]['title'] if len(jobs_df) > 0 else 'All Jobs',
-            'recommendations': recommendations_list,
+            'jobs': job_recommendations,
+            'total_jobs': len(jobs_df),
             'total_candidates': len(cvs_data),
             'timestamp': datetime.now().isoformat()
         }), 200

@@ -719,52 +719,150 @@
         // Display Results
         function displayResults(data) {
             const container = document.getElementById('resultsContainer');
-            document.getElementById('resultsTitle').textContent = 
-                `Ranked Candidates for: ${data.job_title}`;
-            document.getElementById('matchCount').textContent = data.recommendations.length;
+            const resultsSection = document.getElementById('resultsSection');
             
-            container.innerHTML = data.recommendations.map(candidate => {
-                const rankClass = candidate.rank === 1 ? 'gold' : 
-                                candidate.rank === 2 ? 'silver' : 
-                                candidate.rank === 3 ? 'bronze' : '';
-                
-                const matchClass = candidate.match_percentage >= 70 ? 'excellent' :
-                                  candidate.match_percentage >= 50 ? 'good' :
-                                  candidate.match_percentage >= 30 ? 'moderate' : 'low';
-                
-                return `
-                    <div class="candidate-card">
-                        <div class="candidate-header">
-                            <div class="rank-badge ${rankClass}">${candidate.rank}</div>
-                            <div class="candidate-info">
-                                <h3>${candidate.name}</h3>
-                                <span class="match-score ${matchClass}">
-                                    ${candidate.match_percentage}% Match
-                                </span>
-                            </div>
-                        </div>
-                        <div class="candidate-summary">
-                            ${candidate.summary}
-                        </div>
-                        <div class="candidate-details">
-                            <div class="detail-box">
-                                <h4>Skills</h4>
-                                <p>${candidate.skills || 'No skills information'}</p>
-                            </div>
-                            <div class="detail-box">
-                                <h4>Experience</h4>
-                                <p>${candidate.experience || 'No experience information'}</p>
-                            </div>
-                            <div class="detail-box">
-                                <h4>Education</h4>
-                                <p>${candidate.education || 'No education information'}</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            // Handle both old format (recommendations) and new format (jobs)
+            const jobs = data.jobs || [];
+            const totalJobs = data.total_jobs || jobs.length || 1;
+            const totalCandidates = data.total_candidates || 0;
             
-            document.getElementById('resultsSection').classList.add('active');
+            // Update title and match count
+            if (jobs.length > 1) {
+                document.getElementById('resultsTitle').textContent = 
+                    `Ranked Candidates for ${jobs.length} Jobs`;
+            } else if (jobs.length === 1) {
+                document.getElementById('resultsTitle').textContent = 
+                    `Ranked Candidates for: ${jobs[0].job_title}`;
+            } else {
+                document.getElementById('resultsTitle').textContent = 'Ranked Candidates';
+            }
+            
+            // Count total matches
+            let totalMatches = 0;
+            if (jobs.length > 0) {
+                totalMatches = jobs.reduce((sum, job) => sum + (job.candidates ? job.candidates.length : 0), 0);
+            } else if (data.recommendations) {
+                totalMatches = data.recommendations.length;
+            }
+            
+            document.getElementById('matchCount').textContent = totalMatches;
+            
+            // Build HTML for all jobs
+            let html = '';
+            
+            if (jobs.length > 0) {
+                // New format: grouped by jobs
+                jobs.forEach((job, jobIndex) => {
+                    const candidates = job.candidates || [];
+                    
+                    html += `
+                        <div class="job-section" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                <h3 style="margin: 0; font-size: 1.3em;">📋 ${job.job_title}</h3>
+                                <div style="margin-top: 5px; font-size: 0.9em; opacity: 0.9;">
+                                    Job ID: ${job.job_id} | ${candidates.length} Candidate${candidates.length !== 1 ? 's' : ''} Matched
+                                </div>
+                            </div>
+                            <div class="candidates-grid" style="display: grid; gap: 15px;">
+                    `;
+                    
+                    candidates.forEach(candidate => {
+                        const rankClass = candidate.rank === 1 ? 'gold' : 
+                                        candidate.rank === 2 ? 'silver' : 
+                                        candidate.rank === 3 ? 'bronze' : '';
+                        
+                        const matchClass = candidate.match_percentage >= 70 ? 'excellent' :
+                                          candidate.match_percentage >= 50 ? 'good' :
+                                          candidate.match_percentage >= 30 ? 'moderate' : 'low';
+                        
+                        html += `
+                            <div class="candidate-card">
+                                <div class="candidate-header">
+                                    <div class="rank-badge ${rankClass}">${candidate.rank}</div>
+                                    <div class="candidate-info">
+                                        <h3>${candidate.name || candidate.candidate_id}</h3>
+                                        <span class="match-score ${matchClass}">
+                                            ${candidate.match_percentage.toFixed(2)}% Match
+                                        </span>
+                                    </div>
+                                </div>
+                                ${candidate.summary ? `<div class="candidate-summary">${candidate.summary}</div>` : ''}
+                                <div class="candidate-details">
+                                    <div class="detail-box">
+                                        <h4>Skills</h4>
+                                        <p>${candidate.skills || 'No skills information'}</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>Experience</h4>
+                                        <p>${candidate.experience || 'No experience information'}</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>Education</h4>
+                                        <p>${candidate.education || 'No education information'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+            } else if (data.recommendations) {
+                // Fallback for old format
+                html = data.recommendations.map(candidate => {
+                    const rankClass = candidate.rank === 1 ? 'gold' : 
+                                    candidate.rank === 2 ? 'silver' : 
+                                    candidate.rank === 3 ? 'bronze' : '';
+                    
+                    const matchClass = candidate.match_percentage >= 70 ? 'excellent' :
+                                      candidate.match_percentage >= 50 ? 'good' :
+                                      candidate.match_percentage >= 30 ? 'moderate' : 'low';
+                    
+                    return `
+                        <div class="candidate-card">
+                            <div class="candidate-header">
+                                <div class="rank-badge ${rankClass}">${candidate.rank}</div>
+                                <div class="candidate-info">
+                                    <h3>${candidate.name}</h3>
+                                    <span class="match-score ${matchClass}">
+                                        ${candidate.match_percentage}% Match
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="candidate-summary">
+                                ${candidate.summary}
+                            </div>
+                            <div class="candidate-details">
+                                <div class="detail-box">
+                                    <h4>Skills</h4>
+                                    <p>${candidate.skills || 'No skills information'}</p>
+                                </div>
+                                <div class="detail-box">
+                                    <h4>Experience</h4>
+                                    <p>${candidate.experience || 'No experience information'}</p>
+                                </div>
+                                <div class="detail-box">
+                                    <h4>Education</h4>
+                                    <p>${candidate.education || 'No education information'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            if (!html) {
+                html = '<p style="text-align: center; color: #999; padding: 40px;">No recommendations found</p>';
+            }
+            
+            container.innerHTML = html;
+            resultsSection.classList.add('active');
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
         // Update Stats
