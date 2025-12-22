@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV Ranking System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px dashed #667eea;
+        }
+        
+        .upload-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .file-upload-area {
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+            margin-bottom: 15px;
+        }
+        
+        .file-upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .file-upload-area.dragover {
+            border-color: #764ba2;
+            background: #f0f4ff;
+            transform: scale(1.02);
+        }
+        
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .file-list {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+        }
+        
+        .file-item .filename {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .file-item .size {
+            color: #666;
+            font-size: 0.85em;
+        }
+        
+        .text-input-section {
+            margin-top: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+            padding: 20px 30px;
+            background: #f8f9fa;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card .number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-card .label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .results-section {
+            padding: 30px;
+            display: none;
+        }
+        
+        .results-section.active {
+            display: block;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .results-header h2 {
+            color: #333;
+        }
+        
+        .candidate-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        
+        .candidate-card:hover {
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .candidate-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .rank-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        
+        .rank-badge.gold {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        }
+        
+        .rank-badge.silver {
+            background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
+        }
+        
+        .rank-badge.bronze {
+            background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%);
+        }
+        
+        .candidate-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .match-score {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .match-score.excellent {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .match-score.good {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .match-score.moderate {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .match-score.low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .candidate-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .candidate-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .detail-box {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .detail-box h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .detail-box p {
+            color: #666;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 30px;
+            display: none;
+        }
+        
+        .message.active {
+            display: block;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            padding: 20px 30px;
+            background: #f8f9fa;
+        }
+        
+        .action-buttons .btn {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Candidate Recommendation System</h1>
+            <p>Upload CVs and Job Descriptions to Get Ranked Recommendations</p>
+        </div>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="main-content">
+            <!-- CV Upload Section -->
+            <div class="upload-section">
+                <h2>📄 Upload CVs (Multiple Files)</h2>
+                <div class="file-upload-area" id="cvDropZone">
+                    <div class="upload-icon">📁</div>
+                    <p><strong>Click to browse</strong> or drag and drop CV files here</p>
+                    <p style="color: #666; font-size: 0.9em; margin-top: 10px;">Supports: PDF, DOCX, TXT</p>
+                </div>
+                <input type="file" id="cvFileInput" multiple accept=".pdf,.docx,.txt">
+                <div class="file-list" id="cvFileList"></div>
+                <button class="btn" id="uploadCVsBtn" disabled>Upload All CVs</button>
+            </div>
+            
+            <!-- Job Description Section -->
+            <div class="upload-section">
+                <h2>💼 Add Job Description</h2>
+                
+                <!-- File Upload -->
+                <div class="file-upload-area" id="jobDropZone">
+                    <div class="upload-icon">📋</div>
+                    <p><strong>Click to browse</strong> or drag and drop job file</p>
+                    <p style="color: #666; font-size: 0.9em; margin-top: 10px;">Supports: PDF, DOCX, TXT</p>
+                </div>
+                <input type="file" id="jobFileInput" accept=".pdf,.docx,.txt">
+                <button class="btn" id="uploadJobFileBtn" disabled>Upload Job File</button>
+                
+                <!-- Text Input -->
+                <div class="text-input-section">
+                    <p style="text-align: center; margin: 15px 0; color: #666;">— OR —</p>
+                    <div class="form-group">
+                        <label>Job Title</label>
+                        <input type="text" id="jobTitle" placeholder="e.g., Senior Software Engineer">
+                    </div>
+                    <div class="form-group">
+                        <label>Job Description</label>
+                        <textarea id="jobDescription" placeholder="Paste the job description here..."></textarea>
+                    </div>
+                    <button class="btn" id="addJobTextBtn">Add Job Description</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="number" id="cvCount">0</div>
+                <div class="label">CVs Uploaded</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="jobCount">0</div>
+                <div class="label">Jobs Added</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="matchCount">0</div>
+                <div class="label">Matches Found</div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button class="btn" id="generateRankingsBtn" disabled>Generate Rankings</button>
+            <button class="btn btn-secondary" id="clearAllBtn">Clear All Data</button>
+        </div>
+        
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <h2 id="resultsTitle">Ranked Candidates</h2>
+            </div>
+            <div id="resultsContainer"></div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedCVs = [];
+        let selectedJobFile = null;
+        
+        // CV Drop Zone
+        const cvDropZone = document.getElementById('cvDropZone');
+        const cvFileInput = document.getElementById('cvFileInput');
+        const cvFileList = document.getElementById('cvFileList');
+        const uploadCVsBtn = document.getElementById('uploadCVsBtn');
+        
+        cvDropZone.addEventListener('click', () => cvFileInput.click());
+        cvDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            cvDropZone.classList.add('dragover');
+        });
+        cvDropZone.addEventListener('dragleave', () => {
+            cvDropZone.classList.remove('dragover');
+        });
+        cvDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            cvDropZone.classList.remove('dragover');
+            handleCVFiles(e.dataTransfer.files);
+        });
+        
+        cvFileInput.addEventListener('change', (e) => {
+            handleCVFiles(e.target.files);
+        });
+        
+        function handleCVFiles(files) {
+            selectedCVs = Array.from(files);
+            displayCVFiles();
+            uploadCVsBtn.disabled = selectedCVs.length === 0;
+        }
+        
+        function displayCVFiles() {
+            cvFileList.innerHTML = '';
+            selectedCVs.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div>
+                        <div class="filename">${file.name}</div>
+                        <div class="size">${(file.size / 1024).toFixed(1)} KB</div>
+                    </div>
+                    <button onclick="removeCVFile(${index})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Remove</button>
+                `;
+                cvFileList.appendChild(fileItem);
+            });
+        }
+        
+        function removeCVFile(index) {
+            selectedCVs.splice(index, 1);
+            displayCVFiles();
+            uploadCVsBtn.disabled = selectedCVs.length === 0;
+        }
+        
+        // Job Drop Zone
+        const jobDropZone = document.getElementById('jobDropZone');
+        const jobFileInput = document.getElementById('jobFileInput');
+        const uploadJobFileBtn = document.getElementById('uploadJobFileBtn');
+        
+        jobDropZone.addEventListener('click', () => jobFileInput.click());
+        jobDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            jobDropZone.classList.add('dragover');
+        });
+        jobDropZone.addEventListener('dragleave', () => {
+            jobDropZone.classList.remove('dragover');
+        });
+        jobDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            jobDropZone.classList.remove('dragover');
+            handleJobFile(e.dataTransfer.files[0]);
+        });
+        
+        jobFileInput.addEventListener('change', (e) => {
+            handleJobFile(e.target.files[0]);
+        });
+        
+        function handleJobFile(file) {
+            if (file) {
+                selectedJobFile = file;
+                jobDropZone.innerHTML = `
+                    <div class="upload-icon">✓</div>
+                    <p><strong>${file.name}</strong></p>
+                    <p style="color: #666; font-size: 0.9em;">${(file.size / 1024).toFixed(1)} KB</p>
+                `;
+                uploadJobFileBtn.disabled = false;
+            }
+        }
+        
+        // Upload CVs
+        uploadCVsBtn.addEventListener('click', async () => {
+            const formData = new FormData();
+            selectedCVs.forEach(file => {
+                formData.append('files[]', file);
+            });
+            
+            showLoading(true);
+            try {
+                const response = await fetch('/api/upload-cvs-bulk', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                showMessage(data.success ? 'success' : 'error', 
+                    data.message || data.error);
+                updateStats();
+                selectedCVs = [];
+                cvFileList.innerHTML = '';
+                uploadCVsBtn.disabled = true;
+            } catch (error) {
+                showMessage('error', 'Failed to upload CVs: ' + error.message);
+            }
+            showLoading(false);
+        });
+        
+        // Upload Job File
+        uploadJobFileBtn.addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('file', selectedJobFile);
+            
+            showLoading(true);
+            try {
+                const response = await fetch('/api/upload-job-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                showMessage(data.success ? 'success' : 'error', 
+                    data.message || data.error);
+                updateStats();
+                selectedJobFile = null;
+                jobDropZone.innerHTML = `
+                    <div class="upload-icon">📋</div>
+                    <p><strong>Click to browse</strong> or drag and drop job file</p>
+                    <p style="color: #666; font-size: 0.9em; margin-top: 10px;">Supports: PDF, DOCX, TXT</p>
+                `;
+                uploadJobFileBtn.disabled = true;
+            } catch (error) {
+                showMessage('error', 'Failed to upload job: ' + error.message);
+            }
+            showLoading(false);
+        });
+        
+        // Add Job Text
+        document.getElementById('addJobTextBtn').addEventListener('click', async () => {
+            const title = document.getElementById('jobTitle').value.trim();
+            const description = document.getElementById('jobDescription').value.trim();
+            
+            if (!description) {
+                showMessage('error', 'Please enter a job description');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const response = await fetch('/api/add-job-text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: title || 'Untitled Position',
+                        job_description: description
+                    })
+                });
+                const data = await response.json();
+                showMessage(data.success ? 'success' : 'error', 
+                    data.message || data.error);
+                updateStats();
+                document.getElementById('jobTitle').value = '';
+                document.getElementById('jobDescription').value = '';
+            } catch (error) {
+                showMessage('error', 'Failed to add job: ' + error.message);
+            }
+            showLoading(false);
+        });
+        
+        // Generate Rankings
+        document.getElementById('generateRankingsBtn').addEventListener('click', async () => {
+            showLoading(true);
+            document.getElementById('resultsSection').classList.remove('active');
+            
+            try {
+                const response = await fetch('/api/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                    showMessage('success', 'Rankings generated successfully!');
+                } else {
+                    showMessage('error', data.error);
+                }
+            } catch (error) {
+                showMessage('error', 'Failed to generate rankings: ' + error.message);
+            }
+            showLoading(false);
+        });
+        
+        // Clear All
+        document.getElementById('clearAllBtn').addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to clear all data?')) return;
+            
+            showLoading(true);
+            try {
+                await fetch('/api/clear', { method: 'POST' });
+                showMessage('success', 'All data cleared');
+                updateStats();
+                document.getElementById('resultsSection').classList.remove('active');
+            } catch (error) {
+                showMessage('error', 'Failed to clear data: ' + error.message);
+            }
+            showLoading(false);
+        });
+        
+        // Display Results
+        function displayResults(data) {
+            const container = document.getElementById('resultsContainer');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            // Handle both old format (recommendations) and new format (jobs)
+            const jobs = data.jobs || [];
+            const totalJobs = data.total_jobs || jobs.length || 1;
+            const totalCandidates = data.total_candidates || 0;
+            
+            // Update title and match count
+            if (jobs.length > 1) {
+                document.getElementById('resultsTitle').textContent = 
+                    `Ranked Candidates for ${jobs.length} Jobs`;
+            } else if (jobs.length === 1) {
+                document.getElementById('resultsTitle').textContent = 
+                    `Ranked Candidates for: ${jobs[0].job_title}`;
+            } else {
+                document.getElementById('resultsTitle').textContent = 'Ranked Candidates';
+            }
+            
+            // Count total matches
+            let totalMatches = 0;
+            if (jobs.length > 0) {
+                totalMatches = jobs.reduce((sum, job) => sum + (job.candidates ? job.candidates.length : 0), 0);
+            } else if (data.recommendations) {
+                totalMatches = data.recommendations.length;
+            }
+            
+            document.getElementById('matchCount').textContent = totalMatches;
+            
+            // Build HTML for all jobs
+            let html = '';
+            
+            if (jobs.length > 0) {
+                // New format: grouped by jobs
+                jobs.forEach((job, jobIndex) => {
+                    const candidates = job.candidates || [];
+                    
+                    html += `
+                        <div class="job-section" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                <h3 style="margin: 0; font-size: 1.3em;">📋 ${job.job_title}</h3>
+                                <div style="margin-top: 5px; font-size: 0.9em; opacity: 0.9;">
+                                    Job ID: ${job.job_id} | ${candidates.length} Candidate${candidates.length !== 1 ? 's' : ''} Matched
+                                </div>
+                            </div>
+                            <div class="candidates-grid" style="display: grid; gap: 15px;">
+                    `;
+                    
+                    candidates.forEach(candidate => {
+                        const rankClass = candidate.rank === 1 ? 'gold' : 
+                                        candidate.rank === 2 ? 'silver' : 
+                                        candidate.rank === 3 ? 'bronze' : '';
+                        
+                        const matchClass = candidate.match_percentage >= 70 ? 'excellent' :
+                                          candidate.match_percentage >= 50 ? 'good' :
+                                          candidate.match_percentage >= 30 ? 'moderate' : 'low';
+                        
+                        html += `
+                            <div class="candidate-card">
+                                <div class="candidate-header">
+                                    <div class="rank-badge ${rankClass}">${candidate.rank}</div>
+                                    <div class="candidate-info">
+                                        <h3>${candidate.name || candidate.candidate_id}</h3>
+                                        <span class="match-score ${matchClass}">
+                                            ${candidate.match_percentage.toFixed(2)}% Match
+                                        </span>
+                                    </div>
+                                </div>
+                                ${candidate.summary ? `<div class="candidate-summary">${candidate.summary}</div>` : ''}
+                                <div class="candidate-details">
+                                    <div class="detail-box">
+                                        <h4>Skills</h4>
+                                        <p>${candidate.skills || 'No skills information'}</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>Experience</h4>
+                                        <p>${candidate.experience || 'No experience information'}</p>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>Education</h4>
+                                        <p>${candidate.education || 'No education information'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+            } else if (data.recommendations) {
+                // Fallback for old format
+                html = data.recommendations.map(candidate => {
+                    const rankClass = candidate.rank === 1 ? 'gold' : 
+                                    candidate.rank === 2 ? 'silver' : 
+                                    candidate.rank === 3 ? 'bronze' : '';
+                    
+                    const matchClass = candidate.match_percentage >= 70 ? 'excellent' :
+                                      candidate.match_percentage >= 50 ? 'good' :
+                                      candidate.match_percentage >= 30 ? 'moderate' : 'low';
+                    
+                    return `
+                        <div class="candidate-card">
+                            <div class="candidate-header">
+                                <div class="rank-badge ${rankClass}">${candidate.rank}</div>
+                                <div class="candidate-info">
+                                    <h3>${candidate.name}</h3>
+                                    <span class="match-score ${matchClass}">
+                                        ${candidate.match_percentage}% Match
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="candidate-summary">
+                                ${candidate.summary}
+                            </div>
+                            <div class="candidate-details">
+                                <div class="detail-box">
+                                    <h4>Skills</h4>
+                                    <p>${candidate.skills || 'No skills information'}</p>
+                                </div>
+                                <div class="detail-box">
+                                    <h4>Experience</h4>
+                                    <p>${candidate.experience || 'No experience information'}</p>
+                                </div>
+                                <div class="detail-box">
+                                    <h4>Education</h4>
+                                    <p>${candidate.education || 'No education information'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            if (!html) {
+                html = '<p style="text-align: center; color: #999; padding: 40px;">No recommendations found</p>';
+            }
+            
+            container.innerHTML = html;
+            resultsSection.classList.add('active');
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        // Update Stats
+        async function updateStats() {
+            try {
+                const [cvsRes, jobsRes] = await Promise.all([
+                    fetch('/api/cvs'),
+                    fetch('/api/jobs')
+                ]);
+                const cvsData = await cvsRes.json();
+                const jobsData = await jobsRes.json();
+                
+                document.getElementById('cvCount').textContent = cvsData.total;
+                document.getElementById('jobCount').textContent = jobsData.total;
+                
+                const canGenerate = cvsData.total > 0 && jobsData.total > 0;
+                document.getElementById('generateRankingsBtn').disabled = !canGenerate;
+            } catch (error) {
+                console.error('Failed to update stats:', error);
+            }
+        }
+        
+        // Show Message
+        function showMessage(type, text) {
+            const msg = document.getElementById('message');
+            msg.className = `message ${type} active`;
+            msg.textContent = text;
+            setTimeout(() => msg.classList.remove('active'), 5000);
+        }
+        
+        // Show Loading
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('active', show);
+        }
+        
+        // Initialize
+        updateStats();
+    </script>
+</body>
+</html>
